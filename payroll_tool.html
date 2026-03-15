@@ -1,0 +1,421 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Payroll Processor</title>
+<link href="https://fonts.googleapis.com/css2?family=DM+Mono:wght@400;500&family=DM+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<style>
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+  :root {
+    --bg: #0f1117; --surface: #181c27; --surface2: #1e2333;
+    --border: #2a3045; --accent: #4f8ef7; --accent2: #38d9a9;
+    --warn: #ffa94d; --text: #e8ecf5; --muted: #6b7694;
+    --font-mono: 'DM Mono', monospace; --font: 'DM Sans', sans-serif;
+  }
+  body { background:var(--bg); color:var(--text); font-family:var(--font); min-height:100vh; display:flex; flex-direction:column; align-items:center; padding:32px 16px 60px; }
+  header { width:100%; max-width:780px; margin-bottom:32px; display:flex; align-items:center; gap:12px; border-bottom:1px solid var(--border); padding-bottom:18px; }
+  .logo-mark { width:34px; height:34px; background:var(--accent); border-radius:8px; display:flex; align-items:center; justify-content:center; font-size:17px; flex-shrink:0; }
+  h1 { font-size:19px; font-weight:600; letter-spacing:-0.3px; }
+  .tag { font-family:var(--font-mono); font-size:11px; background:var(--surface2); color:var(--muted); border:1px solid var(--border); border-radius:4px; padding:2px 7px; margin-left:auto; }
+  .card { background:var(--surface); border:1px solid var(--border); border-radius:14px; padding:28px; width:100%; max-width:780px; margin-bottom:16px; }
+  .section-label { font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:1px; color:var(--muted); margin-bottom:14px; }
+  .setup-card { border-color:rgba(79,142,247,0.35); background:rgba(79,142,247,0.04); }
+  .setup-card .section-label { color:var(--accent); }
+  .setup-steps { display:flex; flex-direction:column; gap:10px; margin:14px 0; }
+  .step { display:flex; gap:12px; align-items:flex-start; }
+  .step-num { width:22px; height:22px; border-radius:50%; background:var(--accent); color:#fff; font-size:11px; font-weight:600; display:flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:2px; }
+  .step p { font-size:13px; color:var(--muted); line-height:1.65; }
+  .step p strong { color:var(--text); }
+  .step p a { color:var(--accent); }
+  .step p code { font-family:var(--font-mono); font-size:11px; background:var(--surface2); padding:1px 5px; border-radius:3px; color:var(--accent2); }
+  .client-id-row { display:flex; gap:8px; margin-top:14px; flex-wrap:wrap; }
+  .client-id-input { flex:1; min-width:180px; background:var(--surface2); border:1px solid var(--border); border-radius:8px; padding:9px 12px; color:var(--text); font-family:var(--font-mono); font-size:12px; outline:none; }
+  .client-id-input:focus { border-color:var(--accent); }
+  .client-id-input::placeholder { color:var(--muted); }
+  .drop-zone { border:2px dashed var(--border); border-radius:10px; padding:48px 24px; text-align:center; cursor:pointer; transition:all 0.2s; position:relative; }
+  .drop-zone:hover, .drop-zone.drag-over { border-color:var(--accent); background:rgba(79,142,247,0.05); }
+  .drop-icon { font-size:36px; margin-bottom:12px; display:block; opacity:0.7; }
+  .drop-zone h2 { font-size:15px; font-weight:500; margin-bottom:5px; }
+  .drop-zone p { color:var(--muted); font-size:13px; }
+  .drop-zone input[type=file] { position:absolute; inset:0; opacity:0; cursor:pointer; width:100%; height:100%; }
+  .btn { display:inline-flex; align-items:center; gap:8px; padding:10px 18px; border-radius:8px; font-family:var(--font); font-size:14px; font-weight:500; cursor:pointer; border:none; transition:all 0.15s; white-space:nowrap; }
+  .btn-drive { background:#1a73e8; color:#fff; }
+  .btn-drive:hover { background:#1557b0; transform:translateY(-1px); }
+  .btn-download { background:var(--surface2); color:var(--text); border:1px solid var(--border); }
+  .btn-download:hover { border-color:var(--accent); color:var(--accent); }
+  .btn-reset { background:transparent; color:var(--muted); border:1px solid var(--border); }
+  .btn-reset:hover { color:var(--text); }
+  .btn-save-id { background:var(--accent); color:#fff; padding:9px 16px; }
+  .btn-save-id:hover { background:#3a7ae8; }
+  .status-bar { display:flex; align-items:center; gap:10px; padding:11px 14px; background:var(--surface2); border-radius:8px; font-size:13px; margin-top:14px; }
+  .dot { width:8px; height:8px; border-radius:50%; background:var(--muted); flex-shrink:0; }
+  .dot.green { background:var(--accent2); }
+  .dot.blue { background:var(--accent); animation:pulse 1.2s infinite; }
+  .dot.orange { background:var(--warn); }
+  @keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.3} }
+  .table-wrap { overflow-x:auto; -webkit-overflow-scrolling:touch; margin-top:10px; }
+  table { width:100%; border-collapse:collapse; font-size:13px; min-width:500px; }
+  th { text-align:left; padding:8px 10px; background:var(--surface2); color:var(--muted); font-weight:500; font-family:var(--font-mono); font-size:11px; text-transform:uppercase; letter-spacing:0.5px; border-bottom:1px solid var(--border); }
+  th:not(:first-child) { text-align:right; }
+  td { padding:8px 10px; border-bottom:1px solid var(--border); color:var(--text); }
+  td:not(:first-child) { text-align:right; font-family:var(--font-mono); font-size:12px; }
+  tr:last-child td { border-bottom:none; }
+  tr:hover td { background:rgba(255,255,255,0.02); }
+  .name-cell { font-weight:500; }
+  .variance-neg { color:#ff6b6b; }
+  .variance-pos { color:var(--accent2); }
+  .ot-badge { display:inline-block; background:rgba(255,169,77,0.15); color:var(--warn); border-radius:4px; padding:1px 6px; font-size:11px; font-family:var(--font-mono); }
+  .vac-badge { display:inline-block; background:rgba(56,217,169,0.12); color:var(--accent2); border-radius:4px; padding:1px 6px; font-size:11px; font-family:var(--font-mono); }
+  .totals-row td { background:var(--surface2); font-weight:600; border-top:1px solid var(--border); color:var(--accent); font-family:var(--font-mono); font-size:12px; }
+  .totals-row td:first-child { color:var(--muted); font-family:var(--font); font-size:13px; }
+  .actions { display:flex; gap:10px; margin-top:18px; flex-wrap:wrap; }
+  .period-label { font-family:var(--font-mono); font-size:13px; color:var(--accent); margin-bottom:4px; }
+  .hidden { display:none; }
+  .drive-msg { font-size:13px; margin-top:10px; padding:10px 14px; border-radius:8px; }
+  .drive-msg.loading { background:rgba(79,142,247,0.1); color:var(--accent); }
+  .drive-msg.success { background:rgba(56,217,169,0.1); color:var(--accent2); }
+  .drive-msg.error { background:rgba(255,107,107,0.1); color:#ff6b6b; }
+  .note { font-size:12px; color:var(--muted); line-height:1.65; padding:10px 14px; background:var(--surface2); border-radius:8px; margin-top:12px; }
+  .note strong { color:var(--text); }
+  .saved-badge { display:inline-flex; align-items:center; gap:5px; font-size:12px; color:var(--accent2); background:rgba(56,217,169,0.1); border-radius:4px; padding:2px 8px; margin-left:8px; }
+  @media(max-width:500px) {
+    .card { padding:20px 14px; }
+    .actions { flex-direction:column; }
+    .btn { justify-content:center; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="logo-mark">💼</div>
+  <h1>Payroll Processor</h1>
+  <span class="tag">Blip → Google Drive</span>
+</header>
+
+<!-- SETUP -->
+<div class="card setup-card" id="setupCard">
+  <div class="section-label">⚙ One-Time Setup — Google Drive</div>
+  <p style="font-size:13px;color:var(--muted);line-height:1.65;">To save payroll files directly to your Google Drive from any device, you need a free Google API key. This takes about 5 minutes and only needs to be done once.</p>
+
+  <div class="setup-steps">
+    <div class="step"><div class="step-num">1</div>
+      <p>Go to <a href="https://console.cloud.google.com/" target="_blank">console.cloud.google.com</a> and sign in with your Google account.</p></div>
+    <div class="step"><div class="step-num">2</div>
+      <p>Click <strong>Select a project → New Project</strong>. Name it <strong>Payroll Tool</strong> and click <strong>Create</strong>.</p></div>
+    <div class="step"><div class="step-num">3</div>
+      <p>Go to <strong>APIs &amp; Services → Library</strong>, search <strong>Google Drive API</strong> and click <strong>Enable</strong>.</p></div>
+    <div class="step"><div class="step-num">4</div>
+      <p>Go to <strong>APIs &amp; Services → OAuth consent screen</strong>. Choose <strong>External</strong>, enter an app name (e.g. <em>Payroll Tool</em>) and your email. Click Save &amp; Continue through all steps.</p></div>
+    <div class="step"><div class="step-num">5</div>
+      <p>Go to <strong>Credentials → Create Credentials → OAuth Client ID</strong>. Application type: <strong>Web application</strong>. Under <strong>Authorized JavaScript origins</strong> add <code>null</code>. Click <strong>Create</strong> and copy your <strong>Client ID</strong>.</p></div>
+    <div class="step"><div class="step-num">6</div>
+      <p>Paste your Client ID below and tap <strong>Save</strong>. It will be remembered on this device.</p></div>
+  </div>
+
+  <div class="client-id-row">
+    <input class="client-id-input" type="text" id="clientIdInput" placeholder="Paste your Google OAuth Client ID here…">
+    <button class="btn btn-save-id" onclick="saveClientId()">Save</button>
+    <span class="saved-badge hidden" id="savedBadge">✓ Saved</span>
+  </div>
+  <div class="note" style="margin-top:14px;">
+    💡 <strong>Skip for now?</strong> The <strong>Download XLSX</strong> button always works on desktop without any setup. Add your Client ID whenever you're ready to use it on mobile.
+  </div>
+</div>
+
+<!-- UPLOAD -->
+<div class="card">
+  <div class="section-label">Upload Timesheet</div>
+  <div class="drop-zone" id="dropZone">
+    <input type="file" id="fileInput" accept=".csv">
+    <span class="drop-icon">📂</span>
+    <h2>Drop your Blip CSV here</h2>
+    <p>Or tap to browse · .csv exports from Blip</p>
+  </div>
+  <div class="status-bar">
+    <div class="dot" id="statusDot"></div>
+    <span id="statusText">Waiting for file…</span>
+  </div>
+</div>
+
+<!-- PREVIEW -->
+<div class="card hidden" id="previewCard">
+  <div class="section-label">Preview</div>
+  <div class="period-label" id="periodLabel"></div>
+  <div id="previewTitle" style="font-size:15px;font-weight:600;margin-bottom:14px;"></div>
+  <div class="table-wrap">
+    <table>
+      <thead><tr>
+        <th>Employee</th><th>Reg Hrs</th><th>OT Hrs</th>
+        <th>Total Hrs</th><th>Scheduled</th><th>Variance</th><th>Vacation</th>
+      </tr></thead>
+      <tbody id="previewBody"></tbody>
+      <tfoot><tr class="totals-row" id="totalsRow"></tr></tfoot>
+    </table>
+  </div>
+  <div class="actions">
+    <button class="btn btn-drive" id="driveBtn" onclick="saveToDrive()">
+      <svg width="15" height="13" viewBox="0 0 87.3 78" xmlns="http://www.w3.org/2000/svg"><path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3L27.5 53H0c0 1.55.4 3.1 1.2 4.5z" fill="#0066da"/><path d="M43.65 25L29.9 1.2C28.55.4 27 0 25.45 0c-1.55 0-3.1.4-4.5 1.2L6.6 11.55l18 31.2z" fill="#00ac47"/><path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H59.8z" fill="#ea4335"/><path d="M43.65 25L57.4 1.2C56 .4 54.45 0 52.9 0H34.4c-1.55 0-3.1.4-4.5 1.2z" fill="#00832d"/><path d="M59.8 53H27.5L13.75 76.8c1.4.8 2.95 1.2 4.5 1.2h50.8c1.55 0 3.1-.4 4.5-1.2z" fill="#2684fc"/><path d="M73.4 26.8l-12.75-22.1c-1.35-.8-2.9-1.2-4.45-1.2H52.9L43.65 25l16.15 28H87.3c0-1.55-.4-3.1-1.2-4.5z" fill="#ffba00"/></svg>
+      Save to Google Drive
+    </button>
+    <button class="btn btn-download" onclick="downloadXLSX()">⬇ Download XLSX</button>
+    <button class="btn btn-reset" onclick="resetTool()">↩ New File</button>
+  </div>
+  <div class="drive-msg hidden" id="driveMsg"></div>
+</div>
+
+<script>
+const SCOPES = 'https://www.googleapis.com/auth/drive.file';
+let clientId = localStorage.getItem('goog_client_id') || '';
+let parsedData = null;
+let tokenClient = null;
+let accessToken = null;
+
+window.addEventListener('DOMContentLoaded', () => {
+  if (clientId) {
+    document.getElementById('clientIdInput').value = clientId;
+    document.getElementById('savedBadge').classList.remove('hidden');
+    loadGoogleScript();
+  }
+});
+
+function saveClientId() {
+  const val = document.getElementById('clientIdInput').value.trim();
+  if (!val) { alert('Please paste your Client ID first.'); return; }
+  clientId = val;
+  localStorage.setItem('goog_client_id', clientId);
+  document.getElementById('savedBadge').classList.remove('hidden');
+  loadGoogleScript();
+  alert('Saved! Google Drive is now enabled on this device.');
+}
+
+function loadGoogleScript() {
+  if (document.querySelector('script[src*="accounts.google.com"]')) { initTokenClient(); return; }
+  const s = document.createElement('script');
+  s.src = 'https://accounts.google.com/gsi/client';
+  s.onload = initTokenClient;
+  document.head.appendChild(s);
+}
+
+function initTokenClient() {
+  if (!window.google || !clientId) return;
+  tokenClient = google.accounts.oauth2.initTokenClient({
+    client_id: clientId,
+    scope: SCOPES,
+    callback: (resp) => {
+      if (resp.error) { showDriveMsg('error', 'Google sign-in failed: ' + resp.error); return; }
+      accessToken = resp.access_token;
+      uploadToDrive();
+    }
+  });
+}
+
+// ── File handling ─────────────────────────────────────────────────────────────
+const dropZone = document.getElementById('dropZone');
+const fileInput = document.getElementById('fileInput');
+
+dropZone.addEventListener('dragover', e => { e.preventDefault(); dropZone.classList.add('drag-over'); });
+dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'));
+dropZone.addEventListener('drop', e => { e.preventDefault(); dropZone.classList.remove('drag-over'); if(e.dataTransfer.files[0]) processFile(e.dataTransfer.files[0]); });
+fileInput.addEventListener('change', () => { if(fileInput.files[0]) processFile(fileInput.files[0]); });
+
+function setStatus(type, msg) {
+  document.getElementById('statusDot').className = 'dot' + (type ? ' '+type : '');
+  document.getElementById('statusText').textContent = msg;
+}
+
+function resetTool() {
+  document.getElementById('previewCard').classList.add('hidden');
+  fileInput.value = ''; parsedData = null;
+  setStatus('', 'Waiting for file…');
+}
+
+function processFile(file) {
+  if (!file.name.toLowerCase().endsWith('.csv')) { setStatus('orange', 'Please upload a .csv file.'); return; }
+  setStatus('blue', 'Reading file…');
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      parsedData = parseBlipCSV(e.target.result);
+      renderPreview(parsedData);
+      setStatus('green', `Loaded ${Object.keys(parsedData.people).length} employees · Ready`);
+    } catch(err) { setStatus('orange', 'Parse error: ' + err.message); }
+  };
+  reader.readAsText(file);
+}
+
+// ── CSV Parsing ───────────────────────────────────────────────────────────────
+function parseBlipCSV(text) {
+  const lines = text.split('\n');
+  const periodLine = lines[0].replace(/^\uFEFF/,'').trim();
+  let hi = -1;
+  for (let i=0;i<lines.length;i++) { if(lines[i].startsWith('First name,')){ hi=i; break; } }
+  if (hi===-1) throw new Error('Could not find header row');
+  const all = parseCSVRows(lines.slice(hi).join('\n'));
+  const headers = all[0];
+  const idx = {};
+  headers.forEach((h,i) => idx[h.trim()]=i);
+  const people = {};
+  for (let r=1;r<all.length;r++) {
+    const row=all[r];
+    if(!row||row.length<5) continue;
+    const fn=(row[idx['First name']]||'').trim(), ln=(row[idx['Last name']]||'').trim();
+    if(!fn&&!ln) continue;
+    const name=`${fn} ${ln}`;
+    if(!people[name]) people[name]={daily:[],ot:[],total:null};
+    const entry=(row[idx['Entry']]||'').trim();
+    if(entry==='Total') people[name].total=row;
+    else if(entry==='Overtime') people[name].ot.push(row);
+    else people[name].daily.push(row);
+  }
+  return {periodLine, people, idx};
+}
+
+function parseCSVRows(text) {
+  const rows=[]; let cur=[],field='',inQ=false;
+  for(let i=0;i<text.length;i++){
+    const c=text[i];
+    if(inQ){ if(c==='"'&&text[i+1]==='"'){field+='"';i++;} else if(c==='"'){inQ=false;} else{field+=c;} }
+    else { if(c==='"'){inQ=true;} else if(c===','){cur.push(field);field='';} else if(c==='\n'){cur.push(field);field='';rows.push(cur);cur=[];} else if(c!=='\r'){field+=c;} }
+  }
+  if(field||cur.length){cur.push(field);rows.push(cur);}
+  return rows;
+}
+
+function getVal(row,idx,key){const i=idx[key];return(i!==undefined&&row[i]!==undefined)?row[i].trim():'';}
+function fNum(v){const n=parseFloat(v);return isNaN(n)?0:n;}
+function sortKey(row,idx){return getVal(row,idx,'Start date')+getVal(row,idx,'Start time');}
+
+// ── Preview ───────────────────────────────────────────────────────────────────
+function renderPreview(data) {
+  const {periodLine,people,idx}=data;
+  document.getElementById('periodLabel').textContent=periodLine;
+  document.getElementById('previewTitle').textContent=`${Object.keys(people).length} Employees`;
+  const body=document.getElementById('previewBody');
+  body.innerHTML='';
+  let tR=0,tO=0,tT=0,tS=0,tV=0;
+  Object.keys(people).sort().forEach(name=>{
+    const t=people[name].total; if(!t) return;
+    const tot=fNum(getVal(t,idx,'Duration excluding breaks (Hours)'));
+    const ot=fNum(getVal(t,idx,'Overtime (Hours)'));
+    const reg=tot-ot, sched=fNum(getVal(t,idx,'Total Scheduled (Work Time Only)')),
+          variance=fNum(getVal(t,idx,'Variance')), vac=fNum(getVal(t,idx,'Vacation (Hours)'));
+    tR+=reg;tO+=ot;tT+=tot;tS+=sched;tV+=vac;
+    const vc=variance<0?'variance-neg':variance>0?'variance-pos':'';
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td class="name-cell">${name}${ot>0?' <span class="ot-badge">OT</span>':''}${vac>0?' <span class="vac-badge">VAC</span>':''}</td>
+      <td>${reg.toFixed(2)}</td><td>${ot>0?ot.toFixed(2):'—'}</td><td><strong>${tot.toFixed(2)}</strong></td>
+      <td>${sched>0?sched.toFixed(2):'—'}</td><td class="${vc}">${variance!==0?(variance>0?'+':'')+variance.toFixed(2):'—'}</td>
+      <td>${vac>0?vac.toFixed(2):'—'}</td>`;
+    body.appendChild(tr);
+  });
+  document.getElementById('totalsRow').innerHTML=`<td>TOTALS</td><td>${tR.toFixed(2)}</td><td>${tO.toFixed(2)}</td><td>${tT.toFixed(2)}</td><td>${tS.toFixed(2)}</td><td>—</td><td>${tV.toFixed(2)}</td>`;
+  document.getElementById('previewCard').classList.remove('hidden');
+}
+
+// ── XLSX ──────────────────────────────────────────────────────────────────────
+function buildXLSXBytes() {
+  const {periodLine,people,idx}=parsedData;
+  const wb=XLSX.utils.book_new(), names=Object.keys(people).sort();
+
+  // Summary
+  const sum=[[`Timesheet Summary — ${periodLine}`],[],['Employee','Reg Hours','OT Hours','Total Hours','Scheduled','Variance','Vacation (Hrs)']];
+  names.forEach(n=>{
+    const t=people[n].total; if(!t) return;
+    const tot=fNum(getVal(t,idx,'Duration excluding breaks (Hours)')), ot=fNum(getVal(t,idx,'Overtime (Hours)'));
+    sum.push([n,tot-ot,ot,tot,fNum(getVal(t,idx,'Total Scheduled (Work Time Only)')),fNum(getVal(t,idx,'Variance')),fNum(getVal(t,idx,'Vacation (Hours)'))]);
+  });
+  const ds=4,de=ds+names.length-1;
+  sum.push(['TOTALS',{f:`SUM(B${ds}:B${de})`},{f:`SUM(C${ds}:C${de})`},{f:`SUM(D${ds}:D${de})`},{f:`SUM(E${ds}:E${de})`},'',{f:`SUM(G${ds}:G${de})`}]);
+  const ws1=XLSX.utils.aoa_to_sheet(sum);
+  ws1['!cols']=[22,12,12,13,12,12,15].map(w=>({wch:w}));
+  ws1['!merges']=[{s:{r:0,c:0},e:{r:0,c:6}}];
+  XLSX.utils.book_append_sheet(wb,ws1,'Summary');
+
+  // Detail
+  const det=[[`Daily Detail — ${periodLine}`],[],['Employee','Date','Entry Type','Clock In','Clock Out','Hours','Notes']];
+  names.forEach(n=>{
+    [...people[n].daily,...people[n].ot].sort((a,b)=>sortKey(a,idx)<sortKey(b,idx)?-1:1).forEach(row=>{
+      const e=getVal(row,idx,'Entry'), h=e==='Overtime'?fNum(getVal(row,idx,'Overtime (Hours)')):fNum(getVal(row,idx,'Duration excluding breaks (Hours)'));
+      det.push([n,getVal(row,idx,'Start date'),e,getVal(row,idx,'Start time'),getVal(row,idx,'End time'),h||'',getVal(row,idx,'Blip notes').replace(/\n/g,' ')]);
+    });
+  });
+  const ws2=XLSX.utils.aoa_to_sheet(det);
+  ws2['!cols']=[22,14,12,12,12,10,45].map(w=>({wch:w}));
+  ws2['!merges']=[{s:{r:0,c:0},e:{r:0,c:6}}];
+  XLSX.utils.book_append_sheet(wb,ws2,'Daily Detail');
+
+  // Per-person sheets
+  names.forEach(n=>{
+    const {daily,ot,total:t}=people[n], sd=[[n],[]];
+    if(t){
+      const tot=fNum(getVal(t,idx,'Duration excluding breaks (Hours)')), otH=fNum(getVal(t,idx,'Overtime (Hours)'));
+      sd.push(['WEEK SUMMARY','','','','']);
+      sd.push(['Regular Hours',tot-otH,'','',''],['Overtime Hours',otH,'','',''],
+              ['Scheduled',fNum(getVal(t,idx,'Total Scheduled (Work Time Only)')),'','',''],
+              ['Variance',fNum(getVal(t,idx,'Variance')),'','',''],
+              ['Vacation (Hrs)',fNum(getVal(t,idx,'Vacation (Hours)')),'','','']);
+      sd.push([]);
+    }
+    sd.push(['Date','Type','Clock In','Clock Out','Hours','Notes']);
+    [...daily,...ot].sort((a,b)=>sortKey(a,idx)<sortKey(b,idx)?-1:1).forEach(row=>{
+      const e=getVal(row,idx,'Entry'), h=e==='Overtime'?fNum(getVal(row,idx,'Overtime (Hours)')):fNum(getVal(row,idx,'Duration excluding breaks (Hours)'));
+      sd.push([getVal(row,idx,'Start date'),e,getVal(row,idx,'Start time'),getVal(row,idx,'End time'),h||'',getVal(row,idx,'Blip notes').replace(/\n/g,' ')]);
+    });
+    const wsP=XLSX.utils.aoa_to_sheet(sd);
+    wsP['!cols']=[14,12,12,12,10,40].map(w=>({wch:w}));
+    XLSX.utils.book_append_sheet(wb,wsP,n.substring(0,31));
+  });
+
+  return XLSX.write(wb,{bookType:'xlsx',type:'array'});
+}
+
+// ── Download (desktop) ────────────────────────────────────────────────────────
+function downloadXLSX() {
+  const bytes=buildXLSXBytes();
+  const url=URL.createObjectURL(new Blob([bytes],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'}));
+  const a=document.createElement('a');
+  a.href=url; a.download=`payroll_${dateStr()}.xlsx`;
+  document.body.appendChild(a); a.click(); document.body.removeChild(a); URL.revokeObjectURL(url);
+}
+
+// ── Google Drive ──────────────────────────────────────────────────────────────
+function saveToDrive() {
+  if (!clientId) { showDriveMsg('error','No Client ID saved. Complete the one-time setup above, or use Download XLSX on desktop.'); return; }
+  if (!parsedData) return;
+  hideDriveMsg();
+  if (accessToken) { uploadToDrive(); return; }
+  if (!tokenClient) { showDriveMsg('error','Google auth not ready. Refresh the page and try again.'); return; }
+  tokenClient.requestAccessToken();
+}
+
+async function uploadToDrive() {
+  showDriveMsg('loading','Uploading to Google Drive…');
+  try {
+    const fileName=`payroll_${dateStr()}.xlsx`;
+    const blob=new Blob([buildXLSXBytes()],{type:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'});
+    const form=new FormData();
+    form.append('metadata', new Blob([JSON.stringify({name:fileName,mimeType:'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'})],{type:'application/json'}));
+    form.append('file', blob);
+    const res=await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart&fields=id,webViewLink',{method:'POST',headers:{Authorization:`Bearer ${accessToken}`},body:form});
+    if(!res.ok){
+      const err=await res.json();
+      if(err.error?.code===401){ accessToken=null; tokenClient.requestAccessToken(); return; }
+      throw new Error(err.error?.message||'Upload failed');
+    }
+    const data=await res.json();
+    showDriveMsg('success',`✓ Saved to Google Drive! <a href="${data.webViewLink}" target="_blank" style="color:var(--accent2);font-weight:600;">Open ${fileName} →</a>`);
+  } catch(e) { showDriveMsg('error','Upload failed: '+e.message); }
+}
+
+function showDriveMsg(type, html) {
+  const el=document.getElementById('driveMsg');
+  el.className='drive-msg '+type; el.innerHTML=html; el.classList.remove('hidden');
+}
+function hideDriveMsg(){ document.getElementById('driveMsg').classList.add('hidden'); }
+function dateStr(){ return new Date().toISOString().split('T')[0]; }
+</script>
+</body>
+</html>
